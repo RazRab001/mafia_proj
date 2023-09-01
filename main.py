@@ -25,6 +25,7 @@ class CreateRoom(StatesGroup):
     WaitingForEndRoomCreation = State()
     WaitingForGolos = State()
     WaitingForLoginToAdd = State()
+    StartAddingToRoom = State()
 
 class Roles:
     Mafia = "Мафиози"
@@ -260,10 +261,8 @@ class Room:
     def add_new_role(self, role):
         if len(self.our_roles) < self.num_players:
             self.our_roles.append(role)
-            return True
         else:
-            print(f"No, {self.our_roles.count()}")
-            return False
+            print(f"No, {len(self.our_roles)}")
 
     def add_new_player(self, role, name, id):
         if len(self.players) >= self.num_players:
@@ -358,7 +357,7 @@ class Room:
             self.add_new_role(Roles.Mafia)
 
 
-bot = Bot(token="6525366774:AAE1wYeQf03USfM2ilT-1h6aIKwrk8q5jjE")
+bot = Bot(token="")
 dp = Dispatcher(bot, storage=MemoryStorage())
 logging.basicConfig(level=logging.INFO)
 dp.middleware.setup(LoggingMiddleware())
@@ -427,10 +426,9 @@ async def get_number_of_players(message: types.Message, state: FSMContext):
 @dp.message_handler(state=CreateRoom.WaitingForChoosingLeader)
 async def choose_leader(message: types.Message, state: FSMContext):
     enter_code = message.text
+    await state.update_data(password=enter_code)
     async with state.proxy() as data:
         num_players = data.get('num_players')
-        #room = Room(num_players, enter_code)
-        #data['room'] = room
 
     role_options = list(leader_roles.keys())
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
@@ -439,6 +437,13 @@ async def choose_leader(message: types.Message, state: FSMContext):
     #global room
     room = Room(num_players, enter_code)
     await state.update_data(room=room)
+    #await state.update_data(room_players=room.players)
+    #await state.update_data(room_our_roles=room.our_roles)
+    #await state.update_data(room_num_villagers=room.num_villagers)
+    #await state.update_data(room_num_special_villagers=room.num_special_villagers)
+    #await state.update_data(room_num_leaders=room.num_leaders)
+    #await state.update_data(room_num_mafias=room.num_mafias)
+    #await state.update_data(room_num_special_mafias=room.num_special_mafias)
 
     await message.answer("Выберите лидера:", reply_markup=keyboard)
     for role, description in leader_roles.items():
@@ -460,7 +465,8 @@ async def get_leader(message: types.Message, state: FSMContext):
         "Шериф": Roles.Sherif
     }
     if leader in role_mapping:
-        room.add_new_role(leader)
+        room.our_roles.append(leader)
+        await state.update_data(room=room)
         await message.answer(f"лидер {leader} назначен")
         if room.num_special_mafias > 0:
             role_options = list(special_mafia_roles.keys())
@@ -497,9 +503,11 @@ async def get_special_mafia(message: types.Message, state: FSMContext):
         "Стукач": Roles.Snitch
     }
     if special_mafia in role_mapping:
-        room.add_new_role(special_mafia)
+        room.our_roles.append(special_mafia)
+        await state.update_data(room=room)
         await message.answer(f"{special_mafia} назначен")
         room.num_special_mafias -= 1
+        await state.update_data(room=room)
         if room.num_special_mafias > 0:
             await message.answer("Пожалуйста, введите ещё одного особого персонажа мафии")
         elif room.num_special_villagers > 0:
@@ -532,20 +540,26 @@ async def get_special_villager(message: types.Message, state: FSMContext):
         "Поклонница": Roles.Fan
     }
     if special_villager in role_mapping:
-        room.add_new_role(special_villager)
+        room.our_roles.append(special_villager)
+        await state.update_data(room=room)
         await message.answer(f"{special_villager} назначен")
         room.num_special_villagers -= 1
+        await state.update_data(room=room)
         if room.num_special_villagers > 0:
             await message.answer("Пожалуйста, введите ещё одного особого персонажа")
         else:
             await message.answer(f"Комната на {len(room.our_roles)} игроков создана! Пароль {room.password}")
+            await state.update_data(room=room)
             await message.answer("/create_room - создать комнату\n /add_to_room - присоединиться к комнате")
-            await state.finish()  # Завершение состояния
+            for role in room.our_roles:
+                await message.answer(role)
+            #await state.finish()  # Завершение состояния
+            await CreateRoom.StartAddingToRoom.set()
             return
     else:
         await message.answer("Роли не существует. Пожалуйста, введите существующего особого персонажа:")
 
-@dp.message_handler(commands=['add_to_room'])
+@dp.message_handler(commands=['add_to_room'], state=CreateRoom.StartAddingToRoom)
 async def add_to_room(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         room = data.get('room')
@@ -564,10 +578,10 @@ async def adder_func(message: types.Message, state: FSMContext):
         room = data.get('room')
     player_id = message.from_user.id
     password_to_enter = message.text
-    if room is None:
-        await message.answer("Комната не существует!")
-        await state.finish()
-        return
+    #if room is None:
+        #await message.answer("Комната не существует!")
+        #await state.finish()
+        #return
     #for player in room.players:
         #if player_id == player.id:
             #await bot.send_message(player_id, "ID игрока уже существует.")
