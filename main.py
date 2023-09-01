@@ -362,15 +362,6 @@ dp = Dispatcher(bot, storage=MemoryStorage())
 logging.basicConfig(level=logging.INFO)
 dp.middleware.setup(LoggingMiddleware())
 
-#global num_players
-#num_players = 0
-
-#global room
-#room = None
-
-global creator_id
-creator_id = ""
-
 leader_roles = {
     "Детектив": "Может либо застрелить одного игрока, либо узнать его роль.",
     "Священник": "Может либо застрелить одного игрока, либо узнать его роль. Этот игрок узнаёт личность священника.",
@@ -410,7 +401,6 @@ async def create_room(message: types.Message):
 
 @dp.message_handler(state=CreateRoom.WaitingForNumberOfPlayers)
 async def get_number_of_players(message: types.Message, state: FSMContext):
-    #global num_players
     try:
         num_players = int(message.text)
         if num_players < 0:
@@ -422,37 +412,34 @@ async def get_number_of_players(message: types.Message, state: FSMContext):
     except ValueError:
         await message.answer("Пожалуйста, введите число игроков в числовом формате.")
 
+async def create_buttons(roles, prefix, message):
+    role_options = list(roles.keys())
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
+    keyboard.add(*role_options)
+    await message.answer(f"{prefix}", reply_markup=keyboard)
+    out = ""
+    for role, description in roles.items():
+        out += role + ": " + description + "\n"
+    await message.answer(out)
+
+async def end_func(message, state, room):
+    await message.answer(f"Комната на {len(room.our_roles)} игроков создана! Пароль {room.password}")
+    await message.answer("/create_room - создать комнату\n /add_to_room - присоединиться к комнате")
+    await CreateRoom.StartAddingToRoom.set()
 
 @dp.message_handler(state=CreateRoom.WaitingForChoosingLeader)
 async def choose_leader(message: types.Message, state: FSMContext):
-    enter_code = message.text
-    await state.update_data(password=enter_code)
     async with state.proxy() as data:
         num_players = data.get('num_players')
-
-    role_options = list(leader_roles.keys())
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-    keyboard.add(*role_options)
-
-    #global room
+    enter_code = message.text
     room = Room(num_players, enter_code)
     await state.update_data(room=room)
-    #await state.update_data(room_players=room.players)
-    #await state.update_data(room_our_roles=room.our_roles)
-    #await state.update_data(room_num_villagers=room.num_villagers)
-    #await state.update_data(room_num_special_villagers=room.num_special_villagers)
-    #await state.update_data(room_num_leaders=room.num_leaders)
-    #await state.update_data(room_num_mafias=room.num_mafias)
-    #await state.update_data(room_num_special_mafias=room.num_special_mafias)
 
-    await message.answer("Выберите лидера:", reply_markup=keyboard)
-    for role, description in leader_roles.items():
-        await message.answer(role + ": " + description)
+    await create_buttons(leader_roles, "Выберите лидера:", message)
     await CreateRoom.WaitingForEnterLeader.set()
 
 @dp.message_handler(state=CreateRoom.WaitingForEnterLeader)
 async def get_leader(message: types.Message, state: FSMContext):
-    #global room
     async with state.proxy() as data:
         room = data.get('room')
     leader = message.text
@@ -469,25 +456,13 @@ async def get_leader(message: types.Message, state: FSMContext):
         await state.update_data(room=room)
         await message.answer(f"лидер {leader} назначен")
         if room.num_special_mafias > 0:
-            role_options = list(special_mafia_roles.keys())
-            keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-            keyboard.add(*role_options)
-            await message.answer("Oсобые персонажи мафии:", reply_markup=keyboard)
-            for role, description in special_mafia_roles.items():
-                await message.answer(role + ": " + description)
+            await create_buttons(special_mafia_roles, "Oсобые персонажи мафии:", message)
             await CreateRoom.WaitingForEnterSpecialMafia.set()
         elif room.num_special_villagers > 0:
-            role_options = list(special_villager_roles.keys())
-            keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-            keyboard.add(*role_options)
-            await message.answer("Oсобые мирные жители:", reply_markup=keyboard)
-            for role, description in special_villager_roles.items():
-                await message.answer(role + ": " + description)
+            await create_buttons(special_villager_roles, "Oсобые мирные жители:", message)
             await CreateRoom.WaitingForEnterSpecialVillager.set()
         else:
-            await message.answer(f"Комната на {len(room.our_roles)} игроков создана! Пароль {room.password}")
-            await message.answer("/create_room - создать комнату\n /add_to_room - присоединиться к комнате")
-            await state.finish()
+            await end_func(message, state, room)
     else:
         await message.answer("Роли не существует. Пожалуйста, введите существующего лидера:")
 
@@ -504,25 +479,16 @@ async def get_special_mafia(message: types.Message, state: FSMContext):
     }
     if special_mafia in role_mapping:
         room.our_roles.append(special_mafia)
-        await state.update_data(room=room)
         await message.answer(f"{special_mafia} назначен")
         room.num_special_mafias -= 1
         await state.update_data(room=room)
         if room.num_special_mafias > 0:
             await message.answer("Пожалуйста, введите ещё одного особого персонажа мафии")
         elif room.num_special_villagers > 0:
-            role_options = list(special_villager_roles.keys())
-            keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-            keyboard.add(*role_options)
-            await message.answer("Oсобые мирные жители:", reply_markup=keyboard)
-            for role, description in special_villager_roles.items():
-                await message.answer(role + ": " + description)
+            await create_buttons(special_villager_roles, "Oсобые мирные жители:", message)
             await CreateRoom.WaitingForEnterSpecialVillager.set()
         else:
-            await message.answer(f"Комната на {len(room.our_roles)} игроков создана! Пароль {room.password}")
-            await message.answer("/create_room - создать комнату\n /add_to_room - присоединиться к комнате")
-            await state.finish()  # Завершение состояния
-            return
+            await end_func(message, state, room)
     else:
         await message.answer("Роли не существует. Пожалуйста, введите существующего особого персонажа мафии:")
 
@@ -541,23 +507,28 @@ async def get_special_villager(message: types.Message, state: FSMContext):
     }
     if special_villager in role_mapping:
         room.our_roles.append(special_villager)
-        await state.update_data(room=room)
         await message.answer(f"{special_villager} назначен")
         room.num_special_villagers -= 1
         await state.update_data(room=room)
         if room.num_special_villagers > 0:
             await message.answer("Пожалуйста, введите ещё одного особого персонажа")
         else:
-            await message.answer(f"Комната на {len(room.our_roles)} игроков создана! Пароль {room.password}")
-            await state.update_data(room=room)
-            await message.answer("/create_room - создать комнату\n /add_to_room - присоединиться к комнате")
-            for role in room.our_roles:
-                await message.answer(role)
-            #await state.finish()  # Завершение состояния
-            await CreateRoom.StartAddingToRoom.set()
-            return
+            await end_func(message, state, room)
     else:
         await message.answer("Роли не существует. Пожалуйста, введите существующего особого персонажа:")
+
+async def players_buttons(room, text, state):
+    role_options = []
+    for p in room.players:
+        role_options.append(p.getName())
+
+    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
+    keyboard.add(*role_options)
+
+    for player in room.players:
+        await bot.send_message(player.id, text, reply_markup=keyboard)
+    await state.finish()
+    return
 
 @dp.message_handler(commands=['add_to_room'], state=CreateRoom.StartAddingToRoom)
 async def add_to_room(message: types.Message, state: FSMContext):
@@ -578,10 +549,10 @@ async def adder_func(message: types.Message, state: FSMContext):
         room = data.get('room')
     player_id = message.from_user.id
     password_to_enter = message.text
-    #if room is None:
-        #await message.answer("Комната не существует!")
-        #await state.finish()
-        #return
+    if room is None:
+        await message.answer("Комната не существует!")
+        await state.finish()
+        return
     #for player in room.players:
         #if player_id == player.id:
             #await bot.send_message(player_id, "ID игрока уже существует.")
@@ -595,35 +566,26 @@ async def adder_func(message: types.Message, state: FSMContext):
 
 @dp.message_handler(state=CreateRoom.WaitingForLoginToAdd)
 async def login_func(message: types.Message, state: FSMContext):
-    player_id = message.from_user.id
-    login_to_enter = message.text
     async with state.proxy() as data:
         room = data.get('room')
+
+    player_id = message.from_user.id
+    login_to_enter = message.text
 
     random_role = random.choice(room.our_roles)
     room.our_roles.remove(random_role)
     response = room.add_new_player(random_role, login_to_enter, player_id)
-
     await bot.send_message(player_id, response + f"\nОсталось {len(room.our_roles)} мест.")
-
+    await state.update_data(room=room)
     if len(room.our_roles) == 0:
-        role_options = []
-        for p in room.players:
-            role_options.append(p.getName())
-
-        keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-        keyboard.add(*role_options)
-
-        for player in room.players:
-            await bot.send_message(player.id,
-                "А игра... уже началась! Ночью ведущий по очереди называет особых персонажей. "
-                "\n/do_your_bissnes - особыe персонажи ночью пользуются своими способностями"
-                "\n/end_night - наступает новое дневное обсуждение"
-                "\n/start_new_night"
-                "\n/golosovanije"
-                f"\nВ игре действуют имена: {role_options}", reply_markup=keyboard)
-    await state.finish()
-    return
+        text = "А игра... уже началась! Ночью ведущий по очереди называет особых персонажей. " \
+               "\n/do_your_bissnes - особыe персонажи ночью пользуются своими способностями " \
+               "\n/end_night - наступает новое дневное обсуждение " \
+               "\n/start_new_night " \
+               "\n/golosovanije"
+        await players_buttons(room, text, state)
+    else:
+        await CreateRoom.StartAddingToRoom.set()
 
 @dp.message_handler(commands=['do_your_bissnes'])
 async def do_bissnes(message: types.Message, state: FSMContext):
@@ -667,20 +629,15 @@ async def show_rezults(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         room = data.get('room')
     out = ""
-    role_options = []
 
-    for p in room.players:
-        role_options.append(p.getName())
-        if p.getShoot():
-            out += f"\n{p.getName()} убит"
-            room.players.remove(p)
-        if p.getBlockVoise():
-            out += f"\n{p.getName()} не может голосовать днём"
+    #for p in room.players:
+        #if p.getShoot():
+            #out += f"\n{p.getName()} убит"
+            #room.players.remove(p)
+        #if p.getBlockVoise():
+            #out += f"\n{p.getName()} не может голосовать днём"
 
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-    keyboard.add(*role_options)
-    for p in room.players:
-        bot.send_message(p.id, "End night", reply_markup=keyboard)
+    await players_buttons(room, out)
 
     for player in room.players:
         if not player.getBlockVoise():
