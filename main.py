@@ -8,6 +8,7 @@ from aiogram.utils import executor
 import random
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from collections import Counter
 
 class Roles:
     Mafia = "Мафиози"
@@ -382,6 +383,7 @@ class CreateRoom(StatesGroup):
     StartNewNight = State()
     StartNewDay = State()
     StartVoting = State()
+    WaitingForStartNewNight =State()
 async def create_buttons(roles, prefix, message):
     role_options = list(roles.keys())
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
@@ -617,10 +619,16 @@ async def get_victim_name(message: types.Message, state: FSMContext):
                 num_played = 0
                 await CreateRoom.StartNewDay.set()
     else:
-        await message.answer("Неизвестное имя")
+        await message.answer("Неизвестное имя. Введите имя еще раз: ")
 
+global can_voiting
+can_voiting = []
+
+global voit
+voit = []
 @dp.message_handler(commands=['end_night'], state=CreateRoom.StartNewDay)
 async def show_rezults(message: types.Message, state: FSMContext):
+    global can_voiting
     async with state.proxy() as data:
         room = data.get('room')
     out = ""
@@ -629,66 +637,77 @@ async def show_rezults(message: types.Message, state: FSMContext):
         if p.getShoot():
             out += f"\n{p.getName()} убит"
             room.players.remove(p)
-        if p.getBlockVoise():
+        elif p.getBlockVoise():
             out += f"\n{p.getName()} не может голосовать днём"
+        else:
+            can_voiting.append(p.id)
+    out += f"\nНочь закончилась. Наступает время обсуждений и голосования.\n/voting\n{can_voiting}"
 
     await players_buttons(room, out, state)
     await state.update_data(room=room)
+    await CreateRoom.StartVoting.set()
 
-    for player in room.players:
-        if not player.getBlockVoise():
-            await bot.send_message(player.id, f"{out}\n Nachinajem golosovanije /golosovanije")
+@dp.message_handler(commands=['voting'], state=CreateRoom.StartVoting)
+async def upgrade(message: types.Message, state: FSMContext):
+
+    await message.answer("Введите имя: ")
+    await CreateRoom.WaitingForGolos.set()
+
+@dp.message_handler(state=CreateRoom.WaitingForGolos)
+async def get_victim_name(message: types.Message, state: FSMContext):
+    global voit
+    global can_voiting
+    async with state.proxy() as data:
+        room = data.get('room')
+
+    victim_name = message.text
+    player_id = message.from_user.id
+
+    for ID in can_voiting:
+        if player_id == ID:
+            voit.append(victim_name)
+            can_voiting.remove(player_id)
+            await state.update_data(room=room)
+            if len(can_voiting) <= 0:
+                await message.answer("golosovanie okoncheno")
+                await CreateRoom.WaitingForStartNewNight.set()
+                return
+            else:
+                await message.answer("Yes!")
+                await CreateRoom.StartVoting.set()
+                return
+
+    await message.answer("Вы не можете пока голосовать.")
     await state.finish()
     return
 
-@dp.message_handler(commands=['start_new_night'])
+@dp.message_handler(commands=['start_new_night'], state=CreateRoom.WaitingForStartNewNight)
 async def upgrade(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         room = data.get('room')
-    role_options = []
 
-    for p in room.players:
-        role_options.append(p.getName())
+    global voit
+    global can_voiting
 
-    keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
-    keyboard.add(*role_options)
+    if room is None:
+        # Обработка случая, если room равно None
+        await message.answer("Ошибка: комната не инициализирована.")
+        return
+
+    counter = Counter(voit)
+    most_common_value = counter.most_common(1)[0][0]
+
+    text = f"\n{most_common_value} убит и начинается новая ночь."
+
+    await players_buttons(room, text, state)
     for p in room.players:
         p._block = False
         p.block_voise = False
 
-    for player in room.players:
-        if not player.getShoot():
-            await bot.send_message(player.id, "Start new night", reply_markup=keyboard)
-    await state.finish()
-    return
-
-@dp.message_handler(commands=['golosovanije'])
-async def upgrade(message: types.Message, state: FSMContext):
-
-    await message.answer("Vvedite name: ")
-    await CreateRoom.WaitingForGolos.set()
-global golosoval
-golosoval = []
-
-global golos
-golos = []
-from collections import Counter
-@dp.message_handler(state=CreateRoom.WaitingForGolos)
-async def get_victim_name(message: types.Message, state: FSMContext):
-    global golos
-    global golosoval
-    async with state.proxy() as data:
-        room = data.get('room')
-    golos.append(message.text)
-    golosoval.append(message.from_user.id)
-
-    counter = Counter(golos)
-    most_common_value = counter.most_common(1)[0][0]
-    for player in room.players:
-        await bot.send_message(player.id, f"\n{most_common_value} убит")
-
-    await state.finish()
-    return
+    await state.update_data(room=room)
+    can_voiting = []
+    voit = []
+    await CreateRoom.StartNewNight.set()
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
