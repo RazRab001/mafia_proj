@@ -29,14 +29,20 @@ class Roles:
     Somnambula = "Лунатик"
     Fan = "Поклонница"
 
+class Types:
+    Peasefull = "Pease"
+    Mafiozy = "Mafia"
+
 class Player:
-    def __init__(self, name, role, id):
+    def __init__(self, name, role, id, type):
         self.name = name
         self.role = role
         self.id = id
         self._shooted = False  # Инициализируем атрибут _victim значением None
         self._block = False
         self.block_voise = False
+        self._type = type
+        self._cosmetic_role = role
 
     def setShoot(self, is_shooting, shooter):
         if not shooter.getBlock():
@@ -54,8 +60,15 @@ class Player:
         if not shooter.getBlock():
             self.role = role
 
+    def setCosmeticRole(self, role, shooter):
+        if not shooter.getBlock():
+            self._cosmetic_role = role
+
     def getShoot(self):
         return self._shooted
+
+    def getType(self):
+        return self._type
 
     def getBlock(self):
         return self._block
@@ -69,12 +82,15 @@ class Player:
     def getRole(self):
         return self.role
 
+    def getCosmeticRole(self):
+        return self._cosmetic_role
+
     def main_function(self, victim):
         pass
 
 class Doctor(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Doktor, id)
+        super().__init__(name, Roles.Doktor, id, Types.Peasefull)
 
     def main_function(self, victim):
         victim.setShoot(False, self)
@@ -82,7 +98,7 @@ class Doctor(Player):
 
 class Security(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Security, id)
+        super().__init__(name, Roles.Security, id, Types.Peasefull)
 
     def main_function(self, victim):
         if victim.getShoot():
@@ -92,7 +108,7 @@ class Security(Player):
 
 class Somnambula(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Somnambula, id)
+        super().__init__(name, Roles.Somnambula, id, Types.Peasefull)
 
     def main_function(self, victim):
         victim.setShoot(True, self)
@@ -100,7 +116,7 @@ class Somnambula(Player):
 
 class Prostitute(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Prostitute, id)
+        super().__init__(name, Roles.Prostitute, id, Types.Peasefull)
 
     def main_function(self, victim):
         victim.setBlock(True, self)
@@ -109,42 +125,45 @@ class Prostitute(Player):
 
 class Fan(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Fan, id)
+        super().__init__(name, Roles.Fan, id, Types.Peasefull)
 
     def main_function(self, victim):
-        if victim.getRole() == Roles.Detective or victim.getRole() == Roles.SaintFather or victim.getRole() == Roles.Loer or victim.getRole() == Roles.Paparaci or victim.getRole() == Roles.Prizonist or victim.getRole() == Roles.Sherif:
+        if victim.getCosmeticRole() == Roles.Detective or victim.getCosmeticRole() == Roles.SaintFather or victim.getCosmeticRole() == Roles.Loer or victim.getCosmeticRole() == Roles.Paparaci or victim.getCosmeticRole() == Roles.Prizonist or victim.getCosmeticRole() == Roles.Sherif:
             return f"Поклонница хочет проверить {victim.getName()}" \
-                f"\n{victim.getName()} это {victim.getRole()}"
+                f"\n{victim.getName()} это {victim.getCosmeticRole()}"
         else:
             return f"Поклонница хочет проверить {victim.getName()}" \
                 f"\n{victim.getName()} это не лидер"
 
 class Sherif(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Sherif, id)
+        super().__init__(name, Roles.Sherif, id, Types.Peasefull)
 
     def main_function(self, victim):
         victim.setShoot(True, self)
         return f"Шериф хочет застрелить {victim.getName()}"
 
+prizon = []
 class Prizonist(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Prizonist, id)
+        super().__init__(name, Roles.Prizonist, id, Types.Peasefull)
 
     def main_function(self, victim):
+        global prizon
         if victim.getRole() == Roles.Mafia or victim.getRole() == Roles.Don or victim.getRole() == Roles.Stiller or victim.getRole() == Roles.Advocat or victim.getRole() == Roles.Snitch:
             victim.setBlock(True, self)
-            victim.setBlockVose(True, self)
+            victim.setBlockVoise(True, self)
+            prizon.append(victim)
             return f"Тюремщик хочет проверить {victim.getName()}" \
-                   f"\n{victim.getName()} это {victim.getRole()}" \
+                   f"\n{victim.getName()} это {victim.getCosmeticRole()}" \
                    f"\n{victim.getName()} попадает в тюрьму."
         else:
             return f"Тюремщик хочет проверить {victim.getName()}" \
-                   f"\n{victim.getName()} это {victim.getRole()}"
+                   f"\n{victim.getName()} это {victim.getCosmeticRole()}"
 
 class Detective(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Detective, id)
+        super().__init__(name, Roles.Detective, id, Types.Peasefull)
         self._victim = None
 
     def set_victim(self, victim):
@@ -157,17 +176,11 @@ class Detective(Player):
             return f"Детектив хочет застрелить {self._victim.getName()}"
         else:
             return f"Детектив хочет проверить {self._victim.getName()}" \
-                   f"\n{self._victim.getName()} это {self._victim.getRole()}"
-    def shooting(self):
-        self._victim.setShoot(True, self)
-        return f"Детектив хочет застрелить {self._victim.getName()}"
-    def control(self):
-        return f"Детектив хочет проверить {self._victim.getName()}" \
-               f"\n{self._victim.getName()} это {self._victim.getRole()}"
+                   f"\n{self._victim.getName()} это {self._victim.getCosmeticRole()}"
 
 class SaintFather(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.SaintFather, id)
+        super().__init__(name, Roles.SaintFather, id, Types.Peasefull)
         self._victim = None
     def set_victim(self, victim):
         self._victim = victim
@@ -180,19 +193,34 @@ class SaintFather(Player):
             return f"Священник хочет застрелить {self._victim.getName()}"
         else:
             return f"Священник хочет проверить {self._victim.getName()}" \
-                   f"\n{self._victim.getName()} это {self._victim.getRole()}"
+                   f"\n{self._victim.getName()} это {self._victim.getCosmeticRole()}"
+
+class Paparaci(Player):
+    def __init__(self, name, id):
+        super().__init__(name, Roles.Paparaci, id, Types.Peasefull)
+        self._victim = None
+    def set_victim(self, victim):
+        self._victim = victim
+
+    def main_function(self, victim):
+        if victim is None:
+            return "Журналист не назначен"
+        if victim.getType() == self._victim.getType():
+            return f"{self._victim.getName()} и {victim.getName()} принадлежат к одной стороне."
+        else:
+            return f"{self._victim.getName()} и {victim.getName()} не принадлежат к одной стороне."
 
 class Loer(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Loer, id)
+        super().__init__(name, Roles.Loer, id, Types.Peasefull)
 
     def main_function(self, victim):
         return f"Судья хочет проверить {victim.getName()}" \
-               f"\n{victim.getName()} это {victim.getRole()}"
+               f"\n{victim.getName()} это {victim.getCosmeticRole()}"
 
 class Mafia(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Mafia, id)
+        super().__init__(name, Roles.Mafia, id, Types.Mafiozy)
 
     def main_function(self, victim):
         if victim.getRole() == Roles.Somnambula:
@@ -203,14 +231,14 @@ class Mafia(Player):
 
 class Villager(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Villager, id)
+        super().__init__(name, Roles.Villager, id, Types.Peasefull)
 
     def main_function(self, victim):
         return "HA-HA-HA-HA"
 
 class Don(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Don, id)
+        super().__init__(name, Roles.Don, id, Types.Mafiozy)
 
     def main_function(self, victim):
         victim.setBlockVoise(True, self)
@@ -218,7 +246,7 @@ class Don(Player):
 
 class Stiller(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Stiller, id)
+        super().__init__(name, Roles.Stiller, id, Types.Mafiozy)
 
     def main_function(self, victim):
         victim.setBlock(True, self)
@@ -226,21 +254,40 @@ class Stiller(Player):
 
 class Advocat(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Advocat, id)
+        super().__init__(name, Roles.Advocat, id, Types.Mafiozy)
 
     def main_function(self, victim):
         return f"Адвокат хочет проверить {victim.getName()}" \
-               f"\n{victim.getName()} это {victim.getRole()}" \
+               f"\n{victim.getName()} это {victim.getCosmeticRole()}" \
                f"\nАдвокат не имеет права озвучивать ночью то, что узнал, и не может прямо сообщить своим подельникам, что он адвокат."
 
 class Snitch(Player):
     def __init__(self, name, id):
-        super().__init__(name, Roles.Snitch, id)
+        super().__init__(name, Roles.Snitch, id, Types.Mafiozy)
 
     def main_function(self, victim):
-        victim.setRole(Roles.Mafia, self)
+        victim.setCosmeticRole(Roles.Mafia, self)
         return f"Стукач хочет оклеветать {victim.getName()}"
 
+role_classes = {
+        Roles.Villager: Villager,
+        Roles.Mafia: Mafia,
+        Roles.Don: Don,
+        Roles.Doktor: Doctor,
+        Roles.Prostitute: Prostitute,
+        Roles.Sherif: Sherif,
+        Roles.Detective: Detective,
+        Roles.SaintFather: SaintFather,
+        Roles.Loer: Loer,
+        Roles.Prizonist: Prizonist,
+        Roles.Security: Security,
+        Roles.Somnambula: Somnambula,
+        Roles.Fan: Fan,
+        Roles.Stiller: Stiller,
+        Roles.Advocat: Advocat,
+        Roles.Snitch: Snitch,
+        Roles.Paparaci: Paparaci
+    }
 class Room:
     def __init__(self, num_players, password):
         self.num_players = num_players
@@ -262,93 +309,49 @@ class Room:
         else:
             print(f"No, {len(self.our_roles)}")
 
+    # Define a dictionary to map role names to role classes
+
     def add_new_player(self, role, name, id):
+
         if len(self.players) >= self.num_players:
             return "Количество игроков в комнате превышено"
-        player = None
-        if role == Roles.Villager:
-            player = Villager(name, id)
-        elif role == Roles.Mafia:
-            player = Mafia(name, id)
-        elif role == Roles.Don:
-            player = Don(name, id)
-        elif role == Roles.Doktor:
-            player = Doctor(name, id)
-        elif role == Roles.Prostitute:
-            player = Prostitute(name, id)
-        elif role == Roles.Sherif:
-            player = Sherif(name, id)
-        elif role == Roles.Detective:
-            player = Detective(name, id)
-        elif role == Roles.SaintFather:
-            player = SaintFather(name, id)
-        elif role == Roles.Loer:
-            player = Loer(name, id)
-        elif role == Roles.Prizonist:
-            player = Prizonist(name, id)
-        elif role == Roles.Security:
-            player = Security(name, id)
-        elif role == Roles.Somnambula:
-            player = Somnambula(name, id)
-        elif role == Roles.Fan:
-            player = Fan(name, id)
-        elif role == Roles.Stiller:
-            player = Stiller(name, id)
-        elif role == Roles.Advocat:
-            player = Advocat(name, id)
-        elif role == Roles.Snitch:
-            player = Snitch(name, id)
-        else:
+
+        # Check if the role is valid
+        if role not in role_classes:
             return "Введена некорректная роль."
+
+        # Create a player instance using the role class from the dictionary
+        player_class = role_classes[role]
+        player = player_class(name, id)
 
         self.players.append(player)
         return f"{player.getName()}, Вы {player.getRole()}"
 
     def create_roles(self, num):
-        if num == 2:
-            self.num_villagers = 0
-            self.num_leaders = 1
-            self.num_special_villagers = 0
-            self.num_mafias = 0
-            self.num_special_mafias = 1
-        elif num == 5:
-            self.num_villagers = 2
-            self.num_leaders = 1
-            self.num_special_villagers = 1
-            self.num_mafias = 1
-        elif num == 6:
-            self.num_villagers = 3
-            self.num_leaders = 1
-            self.num_mafias = 2
-        elif num == 7:
-            self.num_villagers = 4
-            self.num_leaders = 1
-            self.num_mafias = 1
-            self.num_special_mafias = 1
-        elif 8 <= num < 11:
-            self.num_villagers = num - 5
-            self.num_special_villagers = 1
-            self.num_leaders = 1
-            self.num_mafias = 2
-            self.num_special_mafias = 1
-        elif 11 <= num < 14:
-            self.num_villagers = num - 7
-            self.num_special_villagers = 2
-            self.num_leaders = 1
-            self.num_mafias = 3
-            self.num_special_mafias = 1
-        elif num == 14:
-            self.num_villagers = 6
-            self.num_special_villagers = 2
-            self.num_leaders = 1
-            self.num_mafias = 4
-            self.num_special_mafias = 1
-        elif 15 <= num < 17:
-            self.num_villagers = num - 8
-            self.num_special_villagers = 2
-            self.num_leaders = 1
-            self.num_mafias = 3
-            self.num_special_mafias = 2
+        role_configurations = [
+            # num, num_villagers, num_leaders, num_special_villagers, num_mafias, num_special_mafias
+            (2, 0, 1, 0, 0, 1),
+            (5, 2, 1, 1, 1, 0),
+            (6, 3, 1, 0, 2, 0),
+            (7, 4, 1, 0, 1, 1),
+            (8, 3, 1, 1, 2, 1),
+            (11, 6, 1, 2, 3, 1),
+            (14, 6, 1, 2, 4, 1),
+            (17, 9, 1, 2, 3, 2),
+        ]
+
+        for config in role_configurations:
+            if num == config[0]:
+                self.num_villagers = config[1]
+                self.num_leaders = config[2]
+                self.num_special_villagers = config[3]
+                self.num_mafias = config[4]
+                self.num_special_mafias = config[5]
+                break
+        else:
+            return "Некорректное количество игроков."
+
+        # Add roles based on the configuration
         for _ in range(self.num_villagers):
             self.add_new_role(Roles.Villager)
         for _ in range(self.num_mafias):
@@ -401,18 +404,14 @@ class CreateRoom(StatesGroup):
     WaitingForStartNewNight = State()
     WaitingForChoosingFuncktion = State()
     A = State()
+    B = State()
 
-global room
 room = None
-
-global creator_id
 creator_id = 0
-
-global can_voiting
 can_voiting = []
-
-global voit
 voit = []
+
+# Funkce pro vytvoření klávesnice s rolí
 async def create_buttons(roles, prefix, message):
     role_options = list(roles.keys())
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, selective=True)
@@ -423,19 +422,20 @@ async def create_buttons(roles, prefix, message):
         out += role + ": " + description + "\n"
     await message.answer(out)
 
+# Funkce pro ukončení stavu a vytvoření hry
 async def end_func(message, Room, state):
     await message.answer(f"Комната на {len(Room.our_roles)} игроков создана! Пароль {Room.password}")
     await message.answer("/create_room - создать комнату\n /add_to_room - присоединиться к комнате")
-    # await CreateRoom.StartAddingToRoom.set()
     global room
     room = Room
     await state.finish()
-    return
 
+# Odpovídající message handler pro příkaz /start
 @dp.message_handler(commands=['start'])
 async def on_start(message: types.Message):
     await message.answer("Привет! Я ваш mafia-бот.\n /create_room - создать комнату\n /add_to_room - присоединениться к комнате")
 
+# Odpovídající message handler pro příkaz /create_room
 @dp.message_handler(commands=['create_room'])
 async def create_room(message: types.Message):
     global creator_id
@@ -447,6 +447,7 @@ async def create_room(message: types.Message):
     await message.answer("Введите количество игроков в комнате:")
     await CreateRoom.WaitingForNumberOfPlayers.set()
 
+# Odpovídající message handler pro stav WaitingForNumberOfPlayers
 @dp.message_handler(state=CreateRoom.WaitingForNumberOfPlayers)
 async def get_number_of_players(message: types.Message, state: FSMContext):
     try:
@@ -460,6 +461,7 @@ async def get_number_of_players(message: types.Message, state: FSMContext):
     except ValueError:
         await message.answer("Пожалуйста, введите число игроков в числовом формате.")
 
+# Odpovídající message handler pro stav WaitingForChoosingLeader
 @dp.message_handler(state=CreateRoom.WaitingForChoosingLeader)
 async def choose_leader(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
@@ -471,6 +473,7 @@ async def choose_leader(message: types.Message, state: FSMContext):
     await create_buttons(leader_roles, "Выберите лидера:", message)
     await CreateRoom.WaitingForEnterLeader.set()
 
+# Odpovídající message handler pro stav WaitingForEnterLeader
 @dp.message_handler(state=CreateRoom.WaitingForEnterLeader)
 async def get_leader(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
@@ -550,7 +553,7 @@ async def get_special_villager(message: types.Message, state: FSMContext):
     else:
         await message.answer("Роли не существует. Пожалуйста, введите существующего особого персонажа:")
 
-async def players_buttons(room, text, state):
+async def players_buttons(room, text):
     role_options = []
     for p in room.players:
         role_options.append(p.getName())
@@ -561,9 +564,15 @@ async def players_buttons(room, text, state):
     for player in room.players:
         await bot.send_message(player.id, text, reply_markup=keyboard)
 
+async def room_is_exist(room, message, state):
+    if room is None:
+        await message.answer("Комната не существует!")
+        await state.finish()
+        return
 @dp.message_handler(commands=['add_to_room'])
 async def add_to_room(message: types.Message, state: FSMContext):
     global room
+
     if room is None:
         await message.answer("Комната не существует!")
         await state.finish()
@@ -613,10 +622,10 @@ async def login_func(message: types.Message, state: FSMContext):
     if len(room.our_roles) == 0:
         text = "А игра... уже началась! Ночью ведущий по очереди называет особых персонажей. " \
                "\n/do_your_bissnes - особыe персонажи ночью пользуются своими способностями " \
-               "\n/end_night - наступает новое дневное обсуждение " \
-               "\n/start_new_night " \
-               "\n/voting"
-        await players_buttons(room, text, state)
+               "\n/end_night - Ночь заканчивается, и город сталкивается с ее последствиями. Наступает время суда Линча." \
+               "\n/start_new_night - День линчевания подошла к концу, сейчас горожане услышат приговор суда, и счастливые пойдут спать."\
+               "\n/voting - Ночь закончилась. Наступает время обсуждений и голосования."
+        await players_buttons(room, text)
 
     await state.finish()
     return
@@ -661,7 +670,7 @@ async def get_victim_name(message: types.Message, state: FSMContext):
     elif paparaci_player:
         paparaci_player.set_victim(victim)
         await message.answer(f"Пожалуйста, введите имя :                                             👇")
-        await CreateRoom.A.set()
+        await CreateRoom.B.set()
     elif victim:
         matching_player = next((player for player in room.players if player.id == player_id), None)
         message_text = matching_player.main_function(victim)
@@ -674,13 +683,26 @@ async def get_victim_name(message: types.Message, state: FSMContext):
     else:
         await message.answer("Неизвестное имя. Введите имя еще раз: ")
 
+@dp.message_handler(state=CreateRoom.B)
+async def get_victim_do(message: types.Message, state: FSMContext):
+    player_id = message.from_user.id
+    global room
+    victim = next((victim_player for victim_player in room.players if victim_player.getName() == message.text), None)
+    matching_player = next((player for player in room.players if player.id == player_id and player.getRole() == Roles.Paparaci), None)
+    message_text = matching_player.main_function(victim)
+    if message_text:  # Check if the message text is not empty
+        await bot.send_message(player_id, message_text)
+    else:
+        await message.answer("Неизвестное имя.")
+    await state.finish()
+    return
+
 @dp.message_handler(state=CreateRoom.A)
 async def get_victim_do(message: types.Message, state: FSMContext):
     player_id = message.from_user.id
     global room
     matching_player = next((player for player in room.players if player.id == player_id and (player.getRole() == Roles.SaintFather or player.getRole() == Roles.Detective)), None)
     if message.text == "Shoot":
-        print("Yes, shoot")
         message_text = matching_player.main_function(True)
     else:
         message_text = matching_player.main_function(False)
@@ -695,30 +717,41 @@ async def get_victim_do(message: types.Message, state: FSMContext):
     return
 
 async def recikle_players(room, can_voiting, add_text, state):
+    num_mafias = 0;
+    num_villagers = 0;
     out = ""
     for p in room.players:
         if p.getBlockVoise() or p.getShoot():
             if p.getBlockVoise():
                 out += f"\n{p.getName()} не может голосовать днём"
-                print("Zapret golosa")
             if p.getShoot():
                 out += f"\n{p.getName()} убит"
                 if p.id == creator_id:
                     await bot.send_message(p.id,
                                            f"Сегодня ты покидаешь наш город навсегда, {p.getName()}. Но ты остаешься ведущим игры, поэтому не забывай о своих обязанностях даже после смерти." \
-                                           "\n/end_night - наступает новое дневное обсуждение " \
-                                           "\n/start_new_night " \
-                                           "\n/voting")
+                                           "\n/end_night - Ночь заканчивается, и город сталкивается с ее последствиями. Наступает время суда Линча." \
+                                           "\n/start_new_night - День линчевания подошла к концу, сейчас горожане услышат приговор суда, и счастливые пойдут спать.")
                 else:
                     await bot.send_message(p.id,
                                            f"Сегодня ты покидаешь наш город навсегда, {p.getName()}. Покойся с миром и прощай.")
                 room.players.remove(p)
-                print("Kill")
         else:
             can_voiting.append(p.id)
-    out += add_text + f"\n{can_voiting}"
 
-    await players_buttons(room, out, state)
+    for p in room.players:
+        if p.getType() == Types.Peasefull:
+            num_villagers += 1
+        elif p.getType() == Types.Mafiozy:
+            num_mafias += 1
+
+    if num_mafias == 0:
+        out += "\nМирные жители смогли изгнать мафию из города."
+    elif num_mafias >= num_villagers:
+        out += "\nСегодня мафия победила."
+    else:
+        out += add_text
+
+    await players_buttons(room, out)
 
 @dp.message_handler(commands=['end_night'])
 async def show_rezults(message: types.Message, state: FSMContext):
@@ -772,6 +805,7 @@ async def upgrade(message: types.Message, state: FSMContext):
     global voit
     global can_voiting
     global creator_id
+    global prizon
     if creator_id == message.from_user.id:
         await message.answer("С возвращением, ведущий.")
     else:
@@ -784,17 +818,20 @@ async def upgrade(message: types.Message, state: FSMContext):
         await message.answer("Ошибка: комната не инициализирована.")
         await state.finish()
         return
-
+    shooter = Mafia("no_name", 1)
     for p in room.players:
-        p._block = False
-        p.block_voise = False
+        if p in prizon:
+            pass
+        else:
+            p._cosmetic_role = p.getRole()
+            p._block = False
+            p.block_voise = False
 
     if len(voit) > 0:
         counter = Counter(voit)
         most_common_value = counter.most_common(1)[0][0]
         linch_player = next((player for player in room.players if player.getName() == most_common_value), None)
-        shooter = Mafia("no_name", 1)
-        linch_player.setShoot(True, shooter)
+        linch_player._shooted = True
         text = " и начинается новая ночь."
         await recikle_players(room, can_voiting, text, state)
 
